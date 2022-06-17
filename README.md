@@ -1,4 +1,4 @@
-# RESTful Web Services with TDD
+# RESTful Web Services with TDD  [![Java CI with Gradle](https://github.com/maplestoryJin/TDDPractical/actions/workflows/gradle.yml/badge.svg)](https://github.com/maplestoryJin/TDDPractical/actions/workflows/gradle.yml)
 
 ## 任务列表
 * ResourceServlet
