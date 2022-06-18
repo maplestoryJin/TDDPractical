@@ -77,7 +77,6 @@ public class ResourceServletTest extends ServletTest {
 
     }
 
-    // TODO: writer body using MessageBodyWriter
     @Test
     void should_writer_entity_to_http_response_using_message_body_writer() throws Exception {
 

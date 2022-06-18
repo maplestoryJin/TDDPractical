@@ -5,7 +5,7 @@
   * 将请求派分给对应的资源（Resource），并根据返回的状态、超媒体类型、内容，响应 Http 请求
     * ~~使用 OutboundResponse 的 status 作为 Http Response 的状态；~~
     * ~~使用 OutboundResponse 的 headers 作为 Http Response 的 Http Headers；~~
-    * 通过 MessageBodyWriter 将 OutboundResponse 的 GenericEntity 写回为 Body；
+    * ~~通过 MessageBodyWriter 将 OutboundResponse 的 GenericEntity 写回为 Body；~~
     * 如果找不到对应的 MessageBodyWriter，则返回 500 族错误
   * 当资源方法抛出异常时，根据异常影响 Http 请求
     * 如果抛出 WebApplicationException，且 response 不为 null，则使用 response 响应 Http
