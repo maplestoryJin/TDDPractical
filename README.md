@@ -3,14 +3,14 @@
 ## 任务列表
 * ResourceServlet
   * 将请求派分给对应的资源（Resource），并根据返回的状态、超媒体类型、内容，响应 Http 请求
-  * ~~使用 OutboundResponse 的 status 作为 Http Response 的状态；~~
-  * ~~使用 OutboundResponse 的 headers 作为 Http Response 的 Http Headers；~~
-  * 通过 MessageBodyWriter 将 OutboundResponse 的 GenericEntity 写回为 Body；
-  * 如果找不到对应的 MessageBodyWriter，则返回 500 族错误
+    * ~~使用 OutboundResponse 的 status 作为 Http Response 的状态；~~
+    * ~~使用 OutboundResponse 的 headers 作为 Http Response 的 Http Headers；~~
+    * 通过 MessageBodyWriter 将 OutboundResponse 的 GenericEntity 写回为 Body；
+    * 如果找不到对应的 MessageBodyWriter，则返回 500 族错误
   * 当资源方法抛出异常时，根据异常影响 Http 请求
-  * 如果抛出 WebApplicationException，且 response 不为 null，则使用 response 响应 Http
-  * 如果抛出 WebApplicationException，而 response 为 null，则通过异常的具体类型查找 ExceptionMapper，生产 response 响应 Http 请求
-  * 如果抛出的不是 WebApplicationException，则通过异常的具体类型查找 ExceptionMapper，生产 response 响应 Http 请求
+    * 如果抛出 WebApplicationException，且 response 不为 null，则使用 response 响应 Http
+    * 如果抛出 WebApplicationException，而 response 为 null，则通过异常的具体类型查找 ExceptionMapper，生产 response 响应 Http 请求
+    * 如果抛出的不是 WebApplicationException，则通过异常的具体类型查找 ExceptionMapper，生产 response 响应 Http 请求
 * ResourceRouter
   * 将请求派分给对应的资源（Resource），并根据返回的状态、超媒体类型、内容，响应 Http 请求
   * 在处理请求派分时，可以支持多级子资源（Sub-Resource）
@@ -25,3 +25,11 @@
   * 可通过扩展点 ExceptionMapper 处理不同类型的异常
 * ResourceContext
   * 资源对象和资源方法可接受环境组件的注入
+* RuntimeDelegate
+  * 为 MediaType 提供 HeaderDelegate
+  * 为 CacheControl 提供 HeaderDelegate
+  * 为 Cookie 提供 HeaderDelegates
+  * 为 EntityTag 提供 HeaderDelegate
+  * 为 Link 提供 HeaderDelegate
+  * 为 NewCookie 提供 HeaderDelegate
+  * 为 Date 提供 HeaderDelegate
