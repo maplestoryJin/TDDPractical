@@ -6,6 +6,7 @@ import jakarta.ws.rs.core.MultivaluedHashMap;
 import jakarta.ws.rs.core.NewCookie;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.ext.RuntimeDelegate;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.net.http.HttpResponse;
@@ -32,21 +33,8 @@ public class ResourceServletTest extends ServletTest {
         return new ResourceServlet(runtime);
     }
 
-    @Test
-    void should_use_status_code_from_response() throws Exception {
-        OutBoundResponse response = mock(OutBoundResponse.class);
-        when(response.getStatus()).thenReturn(Response.Status.NOT_MODIFIED.getStatusCode());
-        when(response.getHeaders()).thenReturn(new MultivaluedHashMap<>());
-        when(resourceRouter.dispatch(any(), eq(resourceContext))).thenReturn(response);
-        HttpResponse httpResponse = get("/test");
-
-        assertEquals(Response.Status.NOT_MODIFIED.getStatusCode(), httpResponse.statusCode());
-    }
-
-    @Test
-    void should_use_headers_from_response() throws Exception {
-        OutBoundResponse response = mock(OutBoundResponse.class);
-        when(response.getStatus()).thenReturn(Response.Status.NOT_MODIFIED.getStatusCode());
+    @BeforeEach
+    void setUp() {
         RuntimeDelegate runtimeDelegate = mock(RuntimeDelegate.class);
         RuntimeDelegate.setInstance(runtimeDelegate);
         when(runtimeDelegate.createHeaderDelegate(NewCookie.class)).thenReturn(new RuntimeDelegate.HeaderDelegate<>() {
@@ -60,15 +48,31 @@ public class ResourceServletTest extends ServletTest {
                 return value.getName() + "=" + value.getValue();
             }
         });
+    }
+
+    @Test
+    void should_use_status_code_from_response() throws Exception {
+        response(Response.Status.NOT_MODIFIED.getStatusCode(), new MultivaluedHashMap<>());
+        HttpResponse httpResponse = get("/test");
+
+        assertEquals(Response.Status.NOT_MODIFIED.getStatusCode(), httpResponse.statusCode());
+    }
+
+    @Test
+    void should_use_headers_from_response() throws Exception {
         MultivaluedHashMap<String, Object> headers = new MultivaluedHashMap<>();
-        NewCookie sessionId = new NewCookie.Builder("SESSION_ID").value("session").build();
-        NewCookie userId = new NewCookie.Builder("USER_ID").value("user").build();
-        headers.addAll("Set-Cookie", sessionId, userId);
-        when(response.getHeaders()).thenReturn(headers);
-        when(resourceRouter.dispatch(any(), eq(resourceContext))).thenReturn(response);
+        headers.addAll("Set-Cookie", new NewCookie.Builder("SESSION_ID").value("session").build(), new NewCookie.Builder("USER_ID").value("user").build());
+        response(Response.Status.NOT_MODIFIED.getStatusCode(), headers);
         HttpResponse httpResponse = get("/test");
         assertArrayEquals(new String[]{"SESSION_ID=session", "USER_ID=user"}, httpResponse.headers().allValues("Set-Cookie").toArray(String[]::new));
 
+    }
+
+    private void response(int statusCode, MultivaluedHashMap<String, Object> headers) {
+        OutBoundResponse response = mock(OutBoundResponse.class);
+        when(response.getStatus()).thenReturn(statusCode);
+        when(response.getHeaders()).thenReturn(headers);
+        when(resourceRouter.dispatch(any(), eq(resourceContext))).thenReturn(response);
     }
 
     // TODO: writer body using MessageBodyWriter
