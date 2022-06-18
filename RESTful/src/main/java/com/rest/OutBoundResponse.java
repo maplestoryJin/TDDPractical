@@ -8,6 +8,6 @@ import java.lang.annotation.Annotation;
 public abstract class OutBoundResponse extends Response {
     abstract Annotation[] getAnnotations();
 
-    abstract GenericEntity<?> getGenericEntity();
+    abstract GenericEntity getGenericEntity();
 
 }
