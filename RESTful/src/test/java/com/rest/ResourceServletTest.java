@@ -8,7 +8,6 @@ import jakarta.ws.rs.ext.MessageBodyWriter;
 import jakarta.ws.rs.ext.Providers;
 import jakarta.ws.rs.ext.RuntimeDelegate;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -31,7 +30,7 @@ public class ResourceServletTest extends ServletTest {
     private ResourceContext resourceContext;
 
     private Providers providers;
-    private OutBoundResponseBuilder reponse;
+    private OutBoundResponseBuilder response;
 
     @Override
     protected Servlet getServlet() {
@@ -47,7 +46,7 @@ public class ResourceServletTest extends ServletTest {
 
     @BeforeEach
     void setUp() {
-        reponse = new OutBoundResponseBuilder();
+        response = new OutBoundResponseBuilder();
         RuntimeDelegate runtimeDelegate = mock(RuntimeDelegate.class);
         RuntimeDelegate.setInstance(runtimeDelegate);
         when(runtimeDelegate.createHeaderDelegate(NewCookie.class)).thenReturn(new RuntimeDelegate.HeaderDelegate<>() {
@@ -65,7 +64,7 @@ public class ResourceServletTest extends ServletTest {
 
     @Test
     void should_use_status_code_from_response() throws Exception {
-        reponse.status(Response.Status.NOT_MODIFIED).returnFrom(resourceRouter);
+        response.status(Response.Status.NOT_MODIFIED).returnFrom(resourceRouter);
         HttpResponse httpResponse = get("/test");
 
         assertEquals(Response.Status.NOT_MODIFIED.getStatusCode(), httpResponse.statusCode());
@@ -73,7 +72,7 @@ public class ResourceServletTest extends ServletTest {
 
     @Test
     void should_use_headers_from_response() throws Exception {
-        reponse.headers("Set-Cookie", new NewCookie.Builder("SESSION_ID").value("session").build(), new NewCookie.Builder("USER_ID").value("user").build()).returnFrom(resourceRouter);
+        response.headers("Set-Cookie", new NewCookie.Builder("SESSION_ID").value("session").build(), new NewCookie.Builder("USER_ID").value("user").build()).returnFrom(resourceRouter);
         HttpResponse httpResponse = get("/test");
         assertArrayEquals(new String[]{"SESSION_ID=session", "USER_ID=user"}, httpResponse.headers().allValues("Set-Cookie").toArray(String[]::new));
 
@@ -82,17 +81,21 @@ public class ResourceServletTest extends ServletTest {
     @Test
     void should_writer_entity_to_http_response_using_message_body_writer() throws Exception {
 
-        reponse.entity(new GenericEntity<>("entity", String.class), new Annotation[0]).returnFrom(resourceRouter);
+        response.entity(new GenericEntity<>("entity", String.class), new Annotation[0]).returnFrom(resourceRouter);
         HttpResponse httpResponse = get("/test");
         assertEquals("entity", httpResponse.body());
     }
 
-    // TODO: throw WebException with response, use response
-
     @Test
-    @Disabled
-    void should_use_response_from_web_application_exception() {
-//        builder.status(Response.Status.FORBIDDEN).build(resourceRouter);
+    void should_use_response_from_web_application_exception() throws Exception {
+        response.status(Response.Status.FORBIDDEN)
+                .headers(HttpHeaders.SET_COOKIE, new NewCookie.Builder("SESSION_ID").value("session").build())
+                .entity(new GenericEntity<>("error", String.class), new Annotation[0])
+                .throwFrom(resourceRouter);
+        HttpResponse httpResponse = get("/test");
+        assertEquals(Response.Status.FORBIDDEN.getStatusCode(), httpResponse.statusCode());
+        assertArrayEquals(new String[]{"SESSION_ID=session"}, httpResponse.headers().allValues(HttpHeaders.SET_COOKIE).toArray(String[]::new));
+        assertEquals("error", httpResponse.body());
 
     }
 
@@ -129,12 +132,16 @@ public class ResourceServletTest extends ServletTest {
 
         }
         void throwFrom(ResourceRouter router) {
-            builder(response -> when(router.dispatch(any(), eq(resourceContext))).thenThrow(WebApplicationException.class));
+            builder(response -> {
+                WebApplicationException exception = new WebApplicationException(response);
+                when(router.dispatch(any(), eq(resourceContext))).thenThrow(exception);
+            });
 
         }
         void builder(Consumer<OutBoundResponse> consumer) {
             OutBoundResponse response = mock(OutBoundResponse.class);
             when(response.getStatus()).thenReturn(status.getStatusCode());
+            when(response.getStatusInfo()).thenReturn(status);
             when(response.getHeaders()).thenReturn(headers);
             when(response.getGenericEntity()).thenReturn(entity);
             when(response.getAnnotations()).thenReturn(annotations);

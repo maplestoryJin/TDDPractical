@@ -4,6 +4,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.GenericEntity;
 import jakarta.ws.rs.ext.MessageBodyWriter;
 import jakarta.ws.rs.ext.Providers;
@@ -22,7 +23,12 @@ public class ResourceServlet extends HttpServlet {
     @Override
     protected void service(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         ResourceRouter router = runtime.getResourceRouter();
-        OutBoundResponse response = router.dispatch(req, runtime.createResourceContext(req, resp));
+        OutBoundResponse response;
+        try {
+            response = router.dispatch(req, runtime.createResourceContext(req, resp));
+        } catch (WebApplicationException e) {
+            response = (OutBoundResponse) e.getResponse();
+        }
         resp.setStatus(response.getStatus());
         for (String name : response.getHeaders().keySet()) {
             for (Object value : response.getHeaders().get(name)) {
