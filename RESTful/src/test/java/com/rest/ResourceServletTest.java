@@ -109,8 +109,27 @@ public class ResourceServletTest extends ServletTest {
     }
 
 
+
+    @Test
+    void should_not_call_message_body_writer_if_entity_is_null() throws Exception {
+
+        response.entity(null, new Annotation[0]).returnFrom(resourceRouter);
+        HttpResponse httpResponse = get("/test");
+        assertEquals(Response.Status.OK.getStatusCode(), httpResponse.statusCode());
+        assertEquals("", httpResponse.body());
+    }
+
     // TODO: 500 if MessageBodyWriter not found
-    // TODO: entity is null ignore MessageBodyWriter
+    // TODO: 500 if header delegate
+    // TODO: 500 if exception mapper
+
+    // TODO: exception mapper
+    // TODO: provider gets exception mapper
+    // TODO: runtime delegate
+    // TODO: header delegate
+    // TODO: provider get message body writer
+    // TODO: message body writer write
+
     class OutBoundResponseBuilder {
         private Response.Status status = Response.Status.OK;
         private MultivaluedHashMap<String, Object> headers = new MultivaluedHashMap<>();
