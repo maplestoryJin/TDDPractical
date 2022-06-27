@@ -12,27 +12,35 @@ import jakarta.ws.rs.ext.Providers;
 import jakarta.ws.rs.ext.RuntimeDelegate;
 
 import java.io.IOException;
+import java.util.function.Supplier;
 
 public class ResourceServlet extends HttpServlet {
 
     private Runtime runtime;
+    private Providers providers;
 
     public ResourceServlet(Runtime runtime) {
         this.runtime = runtime;
+        this.providers = runtime.getProviders();
     }
 
     @Override
     protected void service(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         ResourceRouter router = runtime.getResourceRouter();
-        OutBoundResponse response;
+        respond(resp, () -> router.dispatch(req, runtime.createResourceContext(req, resp)));
+    }
+
+    private void respond(HttpServletResponse resp, Supplier<OutBoundResponse> supplier) {
         try {
-            response = router.dispatch(req, runtime.createResourceContext(req, resp));
+            respond(resp, supplier.get());
         } catch (WebApplicationException exception) {
-            response = (OutBoundResponse) exception.getResponse();
+            respond(resp, () -> (OutBoundResponse) exception.getResponse());
         } catch (Throwable throwable) {
-            ExceptionMapper exceptionMapper = runtime.getProviders().getExceptionMapper(throwable.getClass());
-            response = (OutBoundResponse) exceptionMapper.toResponse(throwable);
+            respond(resp, () -> from(throwable));
         }
+    }
+
+    private void respond(HttpServletResponse resp, OutBoundResponse response) throws IOException {
         resp.setStatus(response.getStatus());
         for (String name : response.getHeaders().keySet()) {
             for (Object value : response.getHeaders().get(name)) {
@@ -41,11 +49,15 @@ public class ResourceServlet extends HttpServlet {
             }
         }
 
-        Providers providers = runtime.getProviders();
         GenericEntity entity = response.getGenericEntity();
         if (entity != null) {
             MessageBodyWriter writer = providers.getMessageBodyWriter(entity.getRawType(), entity.getType(), response.getAnnotations(), response.getMediaType());
             writer.writeTo(entity.getEntity(), entity.getRawType(), entity.getType(), response.getAnnotations(), response.getMediaType(), response.getHeaders(), resp.getOutputStream());
         }
+    }
+
+    private OutBoundResponse from(Throwable throwable) {
+        ExceptionMapper exceptionMapper = this.providers.getExceptionMapper(throwable.getClass());
+        return (OutBoundResponse) exceptionMapper.toResponse(throwable);
     }
 }

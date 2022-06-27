@@ -103,11 +103,10 @@ public class ResourceServletTest extends ServletTest {
     @Test
     void should_build_response_by_exception_mapper_if_throw_runtime_exception() throws Exception {
         when(resourceRouter.dispatch(any(), eq(resourceContext))).thenThrow(RuntimeException.class);
-        when(providers.getExceptionMapper(RuntimeException.class)).thenReturn(exception -> response.status(Response.Status.FORBIDDEN).build());
+        when(providers.getExceptionMapper(eq(RuntimeException.class))).thenReturn(exception -> response.status(Response.Status.FORBIDDEN).build());
         HttpResponse httpResponse = get("/test");
         assertEquals(Response.Status.FORBIDDEN.getStatusCode(), httpResponse.statusCode());
     }
-
 
 
     @Test
@@ -123,8 +122,28 @@ public class ResourceServletTest extends ServletTest {
     // TODO: 500 if header delegate
     // TODO: 500 if exception mapper
 
-    // TODO: exception mapper
-    // TODO: provider gets exception mapper
+
+    @Test
+    void should_use_response_from_web_application_exception_thrown_by_exception_mapper() throws Exception {
+        when(resourceRouter.dispatch(any(), eq(resourceContext))).thenThrow(RuntimeException.class);
+        when(providers.getExceptionMapper(eq(RuntimeException.class))).thenReturn(exception -> {
+            throw new WebApplicationException(response.status(Response.Status.FORBIDDEN).build());
+        });
+        HttpResponse httpResponse = get("/test");
+        assertEquals(Response.Status.FORBIDDEN.getStatusCode(), httpResponse.statusCode());
+
+    }
+
+    @Test
+    void should_map_exception_thrown_by_provider_gets_exception_mapper() throws Exception {
+        when(resourceRouter.dispatch(any(), eq(resourceContext))).thenThrow(RuntimeException.class);
+        when(providers.getExceptionMapper(eq(RuntimeException.class))).thenThrow(IllegalArgumentException.class);
+        when(providers.getExceptionMapper(eq(IllegalArgumentException.class))).thenReturn(exception -> response.status(Response.Status.FORBIDDEN).build());
+        HttpResponse httpResponse = get("/test");
+        assertEquals(Response.Status.FORBIDDEN.getStatusCode(), httpResponse.statusCode());
+
+    }
+
     // TODO: runtime delegate
     // TODO: header delegate
     // TODO: provider get message body writer
