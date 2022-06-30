@@ -4,13 +4,12 @@ import jakarta.servlet.Servlet;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.container.ResourceContext;
 import jakarta.ws.rs.core.*;
+import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.MessageBodyWriter;
 import jakarta.ws.rs.ext.Providers;
 import jakarta.ws.rs.ext.RuntimeDelegate;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DynamicTest;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestFactory;
+import org.junit.jupiter.api.*;
+import org.mockito.stubbing.OngoingStubbing;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -69,60 +68,45 @@ public class ResourceServletTest extends ServletTest {
         });
     }
 
-    @Test
-    void should_use_status_code_from_response() {
-        response.status(Response.Status.NOT_MODIFIED).returnFrom(resourceRouter);
-        HttpResponse httpResponse = get("/test");
+    @Nested
+    class RespondForOutboundResponse {
 
-        assertEquals(Response.Status.NOT_MODIFIED.getStatusCode(), httpResponse.statusCode());
+
+        @Test
+        void should_use_status_code_from_response() {
+            response.status(Response.Status.NOT_MODIFIED).returnFrom(resourceRouter);
+            HttpResponse httpResponse = get("/test");
+
+            assertEquals(Response.Status.NOT_MODIFIED.getStatusCode(), httpResponse.statusCode());
+        }
+
+        @Test
+        void should_use_headers_from_response() {
+            response.headers("Set-Cookie", new NewCookie.Builder("SESSION_ID").value("session").build(), new NewCookie.Builder("USER_ID").value("user").build()).returnFrom(resourceRouter);
+            HttpResponse httpResponse = get("/test");
+            assertArrayEquals(new String[]{"SESSION_ID=session", "USER_ID=user"}, httpResponse.headers().allValues("Set-Cookie").toArray(String[]::new));
+
+        }
+
+        @Test
+        void should_writer_entity_to_http_response_using_message_body_writer() {
+
+            response.entity(new GenericEntity<>("entity", String.class), new Annotation[0]).returnFrom(resourceRouter);
+            HttpResponse httpResponse = get("/test");
+            assertEquals("entity", httpResponse.body());
+        }
+
+
+        @Test
+        void should_not_call_message_body_writer_if_entity_is_null() {
+
+            response.entity(null, new Annotation[0]).returnFrom(resourceRouter);
+            HttpResponse httpResponse = get("/test");
+            assertEquals(Response.Status.OK.getStatusCode(), httpResponse.statusCode());
+            assertEquals("", httpResponse.body());
+        }
     }
 
-    @Test
-    void should_use_headers_from_response() {
-        response.headers("Set-Cookie", new NewCookie.Builder("SESSION_ID").value("session").build(), new NewCookie.Builder("USER_ID").value("user").build()).returnFrom(resourceRouter);
-        HttpResponse httpResponse = get("/test");
-        assertArrayEquals(new String[]{"SESSION_ID=session", "USER_ID=user"}, httpResponse.headers().allValues("Set-Cookie").toArray(String[]::new));
-
-    }
-
-    @Test
-    void should_writer_entity_to_http_response_using_message_body_writer() {
-
-        response.entity(new GenericEntity<>("entity", String.class), new Annotation[0]).returnFrom(resourceRouter);
-        HttpResponse httpResponse = get("/test");
-        assertEquals("entity", httpResponse.body());
-    }
-
-    @Test
-    void should_use_response_from_web_application_exception() {
-        response.status(Response.Status.FORBIDDEN)
-                .headers(HttpHeaders.SET_COOKIE, new NewCookie.Builder("SESSION_ID").value("session").build())
-                .entity(new GenericEntity<>("error", String.class), new Annotation[0])
-                .throwFrom(resourceRouter);
-        HttpResponse httpResponse = get("/test");
-        assertEquals(Response.Status.FORBIDDEN.getStatusCode(), httpResponse.statusCode());
-        assertArrayEquals(new String[]{"SESSION_ID=session"}, httpResponse.headers().allValues(HttpHeaders.SET_COOKIE).toArray(String[]::new));
-        assertEquals("error", httpResponse.body());
-
-    }
-
-    @Test
-    void should_build_response_by_exception_mapper_if_throw_runtime_exception() {
-        when(resourceRouter.dispatch(any(), eq(resourceContext))).thenThrow(RuntimeException.class);
-        when(providers.getExceptionMapper(eq(RuntimeException.class))).thenReturn(exception -> response.status(Response.Status.FORBIDDEN).build());
-        HttpResponse httpResponse = get("/test");
-        assertEquals(Response.Status.FORBIDDEN.getStatusCode(), httpResponse.statusCode());
-    }
-
-
-    @Test
-    void should_not_call_message_body_writer_if_entity_is_null() {
-
-        response.entity(null, new Annotation[0]).returnFrom(resourceRouter);
-        HttpResponse httpResponse = get("/test");
-        assertEquals(Response.Status.OK.getStatusCode(), httpResponse.statusCode());
-        assertEquals("", httpResponse.body());
-    }
 
     @TestFactory
     public List<DynamicTest> RespondWhenExtensionMissing() {
@@ -143,7 +127,7 @@ public class ResourceServletTest extends ServletTest {
 
 
     @TestFactory
-    public List<DynamicTest> should_respond_base_on_exception_thrown() {
+    public List<DynamicTest> respondForException() {
         List<DynamicTest> tests = new ArrayList<>();
 
         Map<String, Consumer<Consumer<RuntimeException>>> exceptions = Map.of("WebApplicationException", this::webApplicationExceptionThrownFrom,
@@ -195,6 +179,14 @@ public class ResourceServletTest extends ServletTest {
         when(providers.getExceptionMapper(eq(RuntimeException.class))).thenThrow(exception);
     }
 
+    @ExceptionThrownFrom
+    private void exceptionMapper_toResponse(RuntimeException exception) {
+        when(resourceRouter.dispatch(any(), eq(resourceContext))).thenThrow(RuntimeException.class);
+        when(providers.getExceptionMapper(eq(RuntimeException.class))).thenReturn(ex -> {
+            throw exception;
+        });
+    }
+
 
     @ExceptionThrownFrom
     private void runtimeDelegate_createHeaderDelegate(RuntimeException exception) {
@@ -216,10 +208,6 @@ public class ResourceServletTest extends ServletTest {
                 throw exception;
             }
         });
-    }
-
-    private OutBoundResponseBuilder response() {
-        return new OutBoundResponseBuilder();
     }
 
     @ExceptionThrownFrom
@@ -246,6 +234,10 @@ public class ResourceServletTest extends ServletTest {
                 });
     }
 
+
+    private OutBoundResponseBuilder response() {
+        return new OutBoundResponseBuilder();
+    }
 
     private Map<String, Consumer<RuntimeException>> getCallers() {
         Map<String, Consumer<RuntimeException>> callers = new HashMap<>();
@@ -315,7 +307,12 @@ public class ResourceServletTest extends ServletTest {
             when(response.getGenericEntity()).thenReturn(entity);
             when(response.getAnnotations()).thenReturn(annotations);
             when(response.getMediaType()).thenReturn(mediaType);
-            when(providers.getMessageBodyWriter(eq(String.class), eq(String.class), same(annotations), eq(mediaType)))
+            stubMessageBodyWriter();
+            return response;
+        }
+
+        private OngoingStubbing<MessageBodyWriter<String>> stubMessageBodyWriter() {
+            return when(providers.getMessageBodyWriter(eq(String.class), eq(String.class), same(annotations), eq(mediaType)))
                     .thenReturn(new MessageBodyWriter<>() {
                         @Override
                         public boolean isWriteable(Class<?> type, Type genericType, Annotation[] annotations, MediaType mediaType) {
@@ -329,7 +326,6 @@ public class ResourceServletTest extends ServletTest {
                             writer.flush();
                         }
                     });
-            return response;
         }
     }
 }
