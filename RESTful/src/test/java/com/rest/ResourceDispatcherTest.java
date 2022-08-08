@@ -44,9 +44,6 @@ public class ResourceDispatcherTest {
 
     }
 
-    // TODO: 根据与Path匹配结果， 降序排列RootResource, 选择第一个的RootResource
-    // TODO: R1, R2, R1 matched, R2 none R1
-    // TODO: R1, R2, R1, R2, matched, R1 result < R2 result R1
 
     @Test
     void should_use_matched_root_resource() {
