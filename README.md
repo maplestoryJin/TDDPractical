@@ -28,6 +28,11 @@
   * 资源方法可以不明确指定返回的超媒体类型，由 Runtime 自行推断，比如，资源方法标注了 Produces，那么就使用标注提供的超媒体类型等
   * 资源方法可按找期望的类型，访问 Http 请求的内容
   * 资源对象和资源方法可接受环境组件的注入
+  * 将 Resource Method 的返回值包装为 Response 对象
+    * ~~根据与Path匹配结果，降序排列RootResource，选择第一个的RootResource~~
+    * 如果没有匹配的 RootResource，则构造 404 的 Response
+    * 如果返回的 RootResource 中无法匹配剩余Path， 则构造 404 的 Response
+    * 如果 ResourceMethod 返回 null，则构造 204 的 Response
 * Providers
   * 可通过扩展点 MessageBodyWriter 处理不同类型的返回内容
   * 可通过扩展点 ExceptionMapper 处理不同类型的异常
