@@ -14,8 +14,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Vector;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -73,9 +72,11 @@ public class ResourceDispatcherTest {
 
     }
 
-    private ResourceRouter.RootResource rootResource(UriTemplate unMatchedUriTemplate) {
+    private ResourceRouter.RootResource rootResource(UriTemplate uriTemplate) {
         ResourceRouter.RootResource unMatched = mock(ResourceRouter.RootResource.class);
-        when(unMatched.getUriTemplate()).thenReturn(unMatchedUriTemplate);
+        when(unMatched.getUriTemplate()).thenReturn(uriTemplate);
+        when(unMatched.match(eq("/1"), eq("GET"), eq(new String[]{MediaType.WILDCARD}), eq(builder))).thenReturn(Optional.empty());
+
         return unMatched;
     }
 
@@ -85,9 +86,9 @@ public class ResourceDispatcherTest {
         return unMatchedUriTemplate;
     }
 
-    private ResourceRouter.RootResource rootResource(UriTemplate matchedUriTemplate, ResourceRouter.ResourceMethod method) {
+    private ResourceRouter.RootResource rootResource(UriTemplate uriTemplate, ResourceRouter.ResourceMethod method) {
         ResourceRouter.RootResource matched = mock(ResourceRouter.RootResource.class);
-        when(matched.getUriTemplate()).thenReturn(matchedUriTemplate);
+        when(matched.getUriTemplate()).thenReturn(uriTemplate);
         when(matched.match(eq("/1"), eq("GET"), eq(new String[]{MediaType.WILDCARD}), eq(builder))).thenReturn(Optional.of(method));
         return matched;
     }
@@ -144,8 +145,36 @@ public class ResourceDispatcherTest {
     }
 
 
+    @Test
+    void should_return_404_if_no_root_resource_matched() {
+        ResourceRouter router = new DefaultResourceRouter(runtime, List.of(
+                rootResource(unMatched("/users/1"))
+        ));
+        OutBoundResponse response = router.dispatch(request, context);
+        assertNull(response.getGenericEntity());
+        assertEquals(404, response.getStatus());
+    }
 
-    // TODO: 如果没有匹配的RootResource, 则构造404的Response
-    // TODO: 如果返回的RootResource中无法匹配剩余Path, 则构造404的Response
-    // TODO: 如果ResourceMethod返回null, 则构造204的Response
+    @Test
+    void should_return_404_if_no_resource_method_found() {
+
+        DefaultResourceRouter router = new DefaultResourceRouter(runtime, List.of(
+                rootResource(matched("/users/1", result("/1", 2)))));
+
+        OutBoundResponse response = router.dispatch(request, context);
+        assertNull(response.getGenericEntity());
+        assertEquals(404, response.getStatus());
+    }
+
+    @Test
+    void should_return_204_if_method_return_null() {
+
+        DefaultResourceRouter router = new DefaultResourceRouter(runtime, List.of(
+                rootResource(matched("/users/1", result("/1", 2)), returns(null))));
+
+
+        OutBoundResponse response = router.dispatch(request, context);
+        assertNull(response.getGenericEntity());
+        assertEquals(204, response.getStatus());
+    }
 }
