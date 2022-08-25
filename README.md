@@ -37,7 +37,7 @@
   * 资源方法可以不明确指定返回的超媒体类型，由 Runtime 自行推断，比如，资源方法标注了 Produces，那么就使用标注提供的超媒体类型等
   * 资源方法可按找期望的类型，访问 Http 请求的内容
   * 资源对象和资源方法可接受环境组件的注入
-  * 从 Path 标注中获取 UriTemplate
+  * ~~从 Path 标注中获取 UriTemplate~~
     * 如不存在 Path 标注，则抛出异常
 * Providers
   * 可通过扩展点 MessageBodyWriter 处理不同类型的返回内容
