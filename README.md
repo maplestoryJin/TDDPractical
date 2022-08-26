@@ -27,12 +27,12 @@
     * ~~如果 ResourceMethod 返回 null，则构造 204 的 Response~~
 * Resource/RootResource/ResourceMethod
   * 在处理请求派分时，可以支持多级子资源（Sub-Resource）
-    * 当没有资源方法可以匹配请求时，选择最优匹配 SubResourceLocater，通过它继续进行派分
+    * 当没有资源方法可以匹配请求时，选择最优匹配 SubResourceLocator，通过它继续进行派分
     * 如果 SubResourceLocator 也无法找到满足的请求时，返回 404
   * 在处理请求派分时，可以根据客户端提供的超媒体类型，选择对应的资源方法（Resource Method）
-  * 在处理请求派分时，可以根据客户端提供的 Http 方法，选择对应的资源方法
-    * 当请求与资源方法的 Uri 模版一致，且 Http 方法一致时，派分到该方法
-    * 没有资源方法于请求的 Uri 和 Http 方法一致时，返回 404
+  * ~~在处理请求派分时，可以根据客户端提供的 Http 方法，选择对应的资源方法~~
+    * ~~当请求与资源方法的 Uri 模版一致，且 Http 方法一致时，派分到该方法~~
+    * ~~没有资源方法于请求的 Uri 和 Http 方法一致时，返回 404~~
   * 资源方法可以返回 Java 对象，由 Runtime 自行推断正确的返回状态
   * 资源方法可以不明确指定返回的超媒体类型，由 Runtime 自行推断，比如，资源方法标注了 Produces，那么就使用标注提供的超媒体类型等
   * 资源方法可按找期望的类型，访问 Http 请求的内容
