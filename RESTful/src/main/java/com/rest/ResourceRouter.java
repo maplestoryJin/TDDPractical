@@ -8,11 +8,9 @@ import jakarta.ws.rs.core.GenericEntity;
 import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.Response;
 
+import javax.swing.text.html.Option;
 import java.lang.reflect.Method;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public interface ResourceRouter {
@@ -20,7 +18,7 @@ public interface ResourceRouter {
 
 
     interface Resource {
-        Optional<ResourceMethod> match(String path, String method, String[] mediaTypes, UriInfoBuilder builder);
+        Optional<ResourceMethod> match(UriTemplate.MatchResult result, String method, String[] mediaTypes, UriInfoBuilder builder);
     }
 
     interface RootResource extends Resource {
@@ -31,6 +29,8 @@ public interface ResourceRouter {
         GenericEntity<?> call(ResourceContext resourceContext, UriInfoBuilder builder);
 
         PathTemplate getUriTemplate();
+
+        String getHttpMethod();
     }
 
 }
@@ -75,7 +75,7 @@ class DefaultResourceRouter implements ResourceRouter {
         }
 
         private Optional<ResourceMethod> findResourceMethod(HttpServletRequest req, UriInfoBuilder uri) {
-            return matched.flatMap(result -> resource.match(matched.get().getRemaining(), req.getMethod(),
+            return matched.flatMap(result -> resource.match(matched.get(), req.getMethod(),
                     Collections.list(req.getHeaders(HttpHeaders.ACCEPT)).toArray(String[]::new), uri));
         }
     }
@@ -85,7 +85,7 @@ class DefaultResourceRouter implements ResourceRouter {
 class RootResourceClass implements ResourceRouter.RootResource {
     private PathTemplate uriTemplate;
     private Class<?> resourceClass;
-    private List<ResourceRouter.ResourceMethod> resourceMethods;
+    private Map<String, List<ResourceRouter.ResourceMethod>> resourceMethods;
 
     public RootResourceClass(Class<?> resourceClass) {
         this.resourceClass = resourceClass;
@@ -93,16 +93,16 @@ class RootResourceClass implements ResourceRouter.RootResource {
 
         resourceMethods = Arrays.stream(resourceClass.getMethods()).filter(m -> Arrays.stream(m.getAnnotations())
                         .anyMatch(a -> a.annotationType().isAnnotationPresent(HttpMethod.class)))
-                .map(m -> ((ResourceRouter.ResourceMethod) new DefaultResourceMethod(m)))
-                .collect(Collectors.toList());
+                .map(DefaultResourceMethod::new)
+                .collect(Collectors.groupingBy(ResourceRouter.ResourceMethod::getHttpMethod));
     }
 
     @Override
-    public Optional<ResourceRouter.ResourceMethod> match(String path, String method, String[] mediaTypes, UriInfoBuilder builder) {
-        UriTemplate.MatchResult result = uriTemplate.match(path).get();
-        String remaining = result.getRemaining();
-        return resourceMethods.stream().filter(m -> m.getUriTemplate().match(remaining).map(r -> r.getRemaining() == null).orElse(false))
-                .findFirst();
+    public Optional<ResourceRouter.ResourceMethod> match(UriTemplate.MatchResult result, String method, String[] mediaTypes, UriInfoBuilder builder) {
+        String remaining = Optional.ofNullable(result.getRemaining()).orElse("");
+        return Optional.ofNullable(resourceMethods.get(method)).flatMap(methods -> methods.stream().map(m -> match(remaining, m))
+                .filter(r -> r.isMatched()).sorted()
+                .findFirst().map(Result::resourceMethod));
     }
 
     @Override
@@ -110,13 +110,33 @@ class RootResourceClass implements ResourceRouter.RootResource {
         return uriTemplate;
     }
 
+    private Result match(String path, ResourceRouter.ResourceMethod method) {
+        return new Result(method.getUriTemplate().match(path), method);
+    }
+
+    record Result(Optional<UriTemplate.MatchResult> matched,
+                  ResourceRouter.ResourceMethod resourceMethod) implements Comparable<Result> {
+
+        public boolean isMatched() {
+            return matched.map(r -> r.getRemaining() == null).orElse(false);
+        }
+
+        @Override
+        public int compareTo(Result o) {
+            return matched.flatMap(x -> o.matched.map(x::compareTo)).orElse(0);
+        }
+    }
+
     static class DefaultResourceMethod implements ResourceRouter.ResourceMethod {
+        private  String httpMethod;
         private PathTemplate uriTemplate;
         private Method method;
 
         public DefaultResourceMethod(Method method) {
             this.method = method;
-            this.uriTemplate = new PathTemplate(method.getAnnotation(Path.class).value());
+            this.uriTemplate = new PathTemplate(Optional.ofNullable(method.getAnnotation(Path.class)).map(Path::value).orElse(""));
+            this.httpMethod = Arrays.stream(method.getAnnotations()).filter(a -> a.annotationType().isAnnotationPresent(HttpMethod.class))
+                    .findFirst().get().annotationType().getAnnotation(HttpMethod.class).value();
         }
 
         @Override
@@ -132,6 +152,11 @@ class RootResourceClass implements ResourceRouter.RootResource {
         @Override
         public PathTemplate getUriTemplate() {
             return uriTemplate;
+        }
+
+        @Override
+        public String getHttpMethod() {
+            return httpMethod;
         }
     }
 
