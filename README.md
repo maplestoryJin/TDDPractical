@@ -27,7 +27,7 @@
     * ~~如果 ResourceMethod 返回 null，则构造 204 的 Response~~
 * Resource/RootResource/ResourceMethod
   * 在处理请求派分时，可以支持多级子资源（Sub-Resource）
-    * 当没有资源方法可以匹配请求时，选择最优匹配 SubResourceLocator，通过它继续进行派分
+    * ~~当没有资源方法可以匹配请求时，选择最优匹配 SubResourceLocator，通过它继续进行派分~~
     * 如果 SubResourceLocator 也无法找到满足的请求时，返回 404
   * 在处理请求派分时，可以根据客户端提供的超媒体类型，选择对应的资源方法（Resource Method）
   * ~~在处理请求派分时，可以根据客户端提供的 Http 方法，选择对应的资源方法~~
