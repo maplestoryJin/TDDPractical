@@ -1,9 +1,7 @@
 package com.rest;
 
 interface UriInfoBuilder {
-    void pushMethodPath(String path);
+    Object getLastMatchedResource();
 
-    void addParameter(String name, String value);
-
-    String getUnmatchedPath();
+    void addMatchedResource(Object resource);
 }
