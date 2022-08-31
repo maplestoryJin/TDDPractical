@@ -1,10 +1,11 @@
 package com.rest;
 
-import jakarta.ws.rs.*;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.container.ResourceContext;
 import jakarta.ws.rs.core.MediaType;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -29,7 +30,7 @@ public class RootResourceTest {
 
     @Test
     void should_get_uri_template_from_path_annotation() {
-        ResourceRouter.RootResource resource = new RootResourceClass(Messages.class);
+        ResourceRouter.Resource resource = new ResourceHandler(Messages.class);
         UriTemplate uriTemplate = resource.getUriTemplate();
         assertTrue(uriTemplate.match("/messages/hello").isPresent());
     }
@@ -47,35 +48,29 @@ public class RootResourceTest {
     public void should_match_resource_method_in_root_resource(String httpMethod, String path, String resourceMethod, String context) {
         StubUriInfoBuilder uriInfoBuilder = new StubUriInfoBuilder();
 
-        ResourceRouter.RootResource resource = new RootResourceClass(Messages.class);
+        ResourceRouter.Resource resource = new ResourceHandler(Messages.class);
         UriTemplate.MatchResult result = resource.getUriTemplate().match(path).get();
         ResourceRouter.ResourceMethod method = resource.match(result, httpMethod, new String[]{MediaType.TEXT_PLAIN}, resourceContext, uriInfoBuilder).get();
 
         assertEquals(resourceMethod, method.toString());
     }
 
-    @Test
-    void should_match_resource_method_in_sub_resource() {
-        SubResource subResource = new SubResource(new Message());
-        UriTemplate.MatchResult result = mock(UriTemplate.MatchResult.class);
-        when(result.getRemaining()).thenReturn("/content");
-        assertTrue(subResource.match(result, "GET", new String[]{MediaType.TEXT_PLAIN}, resourceContext, mock(UriInfoBuilder.class)).isPresent());
-    }
-
     @ParameterizedTest(name = "{2}")
     @CsvSource(textBlock = """
-            GET,    /messages/hello,       not matched resource method
+            GET,    /messages/hello,            not matched resource method
+            GET,    /messages/1/handler,        not matched sub-resource method
             """)
     public void should_return_empty_if_not_matched(String httpMethod, String uri, String context) {
-        ResourceRouter.RootResource resource = new RootResourceClass(Messages.class);
+        StubUriInfoBuilder stubUriInfoBuilder = new StubUriInfoBuilder();
+        ResourceRouter.Resource resource = new ResourceHandler(Messages.class);
         UriTemplate.MatchResult result = resource.getUriTemplate().match(uri).get();
-        assertTrue(resource.match(result, httpMethod, new String[]{MediaType.TEXT_PLAIN}, resourceContext, mock(UriInfoBuilder.class)).isEmpty());
+        assertTrue(resource.match(result, httpMethod, new String[]{MediaType.TEXT_PLAIN}, resourceContext, stubUriInfoBuilder).isEmpty());
     }
 
     @Test
     void should_add_ast_matched_resource_to_uri_info_builder() {
         StubUriInfoBuilder uriInfoBuilder = new StubUriInfoBuilder();
-        ResourceRouter.RootResource resource = new RootResourceClass(Messages.class);
+        ResourceRouter.Resource resource = new ResourceHandler(Messages.class);
         UriTemplate.MatchResult result = resource.getUriTemplate().match("/messages").get();
 
         resource.match(result, "GET", new String[]{MediaType.TEXT_PLAIN}, resourceContext, uriInfoBuilder);
