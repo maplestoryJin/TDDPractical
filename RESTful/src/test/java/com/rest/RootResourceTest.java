@@ -1,8 +1,6 @@
 package com.rest;
 
-import jakarta.ws.rs.GET;
-import jakarta.ws.rs.Path;
-import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.*;
 import jakarta.ws.rs.container.ResourceContext;
 import jakarta.ws.rs.core.MediaType;
 import org.junit.jupiter.api.BeforeEach;
@@ -10,8 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -35,15 +32,12 @@ public class RootResourceTest {
         assertTrue(uriTemplate.match("/messages/hello").isPresent());
     }
 
-    // TODO find resource method, matches the http request and http method
-
-
 
     @ParameterizedTest(name = "{3}")
     @CsvSource(textBlock = """
             GET,       /messages,               Messages.get,               Map to resource method
             GET,       /messages/1/content,     Message.content,            Map to sub-resource method
-            GET,       /messages/1/body,        MessageBody.get,        Map to sub-sub-resource method
+            GET,       /messages/1/body,        MessageBody.get,            Map to sub-sub-resource method
             """)
     public void should_match_resource_method_in_root_resource(String httpMethod, String path, String resourceMethod, String context) {
         StubUriInfoBuilder uriInfoBuilder = new StubUriInfoBuilder();
@@ -78,7 +72,11 @@ public class RootResourceTest {
         assertTrue(uriInfoBuilder.getLastMatchedResource() instanceof Messages);
     }
 
-    // TODO if resource class does not have a path annotation, throw illegal argument
+    @Test
+    void should_throw_illegal_argument_exception_if_root_resource_not_have_path_annotation() {
+        assertThrows(IllegalArgumentException.class, () -> new ResourceHandler(Message.class));
+    }
+
     // TODO Head and Options special case
 
 
@@ -90,6 +88,24 @@ public class RootResourceTest {
         public String get() {
             return "messages";
         }
+
+        @Path("/special")
+        @GET
+        public String getSpecial() {
+            return "special";
+        }
+
+
+        @HEAD
+        public void head() {
+        }
+
+
+        @OPTIONS
+        public String options() {
+            return "messages";
+        }
+
 
         @Path("/{id:[0-9]+}")
         public Message getById() {

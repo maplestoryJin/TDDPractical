@@ -77,7 +77,49 @@ class ResourceMethods {
 
 
     public Optional<ResourceRouter.ResourceMethod> findResourceMethods(String path, String method) {
-        return Optional.ofNullable(methods.get(method)).flatMap(methods -> UriHandlers.match(path, methods, r -> r.getRemaining() == null));
+        return findMethod(path, method).or(() -> alternative(path, method));
+    }
+
+    private Optional<ResourceRouter.ResourceMethod> alternative(String path, String method) {
+        if (HttpMethod.HEAD.equals(method)) return findMethod(path, HttpMethod.GET).map(HeadResourceMethod::new);
+        if (HttpMethod.OPTIONS.equals(method)) return Optional.of(new OptionResourceMethod(path));
+        return Optional.empty();
+    }
+
+    private Optional<ResourceRouter.ResourceMethod> findMethod(String path, String httpMethod) {
+        return Optional.ofNullable(methods.get(httpMethod)).flatMap(methods -> UriHandlers.match(path, methods, r -> r.getRemaining() == null));
+    }
+
+    class OptionResourceMethod implements ResourceRouter.ResourceMethod {
+        private String path;
+
+        public OptionResourceMethod(String path) {
+            this.path = path;
+        }
+
+        @Override
+        public GenericEntity<?> call(ResourceContext resourceContext, UriInfoBuilder builder) {
+
+            return new GenericEntity<>(Response.noContent().allow(findAllowedMethods()).build(), Response.class);
+        }
+
+        private Set<String> findAllowedMethods() {
+            Set<String> allowed = List.of(HttpMethod.GET, HttpMethod.HEAD, HttpMethod.OPTIONS, HttpMethod.PUT, HttpMethod.POST, HttpMethod.DELETE, HttpMethod.PATCH).stream()
+                    .filter(method -> findMethod(path, method).isPresent()).collect(Collectors.toSet());
+            allowed.add(HttpMethod.OPTIONS);
+            if (allowed.contains(HttpMethod.GET)) allowed.add(HttpMethod.HEAD);
+            return allowed;
+        }
+
+        @Override
+        public UriTemplate getUriTemplate() {
+            return null;
+        }
+
+        @Override
+        public String getHttpMethod() {
+            return null;
+        }
     }
 }
 
@@ -112,6 +154,35 @@ class DefaultResourceMethod implements ResourceRouter.ResourceMethod {
     @Override
     public String getHttpMethod() {
         return httpMethod;
+    }
+}
+
+class HeadResourceMethod implements ResourceRouter.ResourceMethod {
+    private ResourceRouter.ResourceMethod resourceMethod;
+
+    HeadResourceMethod(ResourceRouter.ResourceMethod resourceMethod) {
+        this.resourceMethod = resourceMethod;
+    }
+
+    @Override
+    public GenericEntity<?> call(ResourceContext resourceContext, UriInfoBuilder builder) {
+        resourceMethod.call(resourceContext, builder);
+        return null;
+    }
+
+    @Override
+    public UriTemplate getUriTemplate() {
+        return resourceMethod.getUriTemplate();
+    }
+
+    @Override
+    public String getHttpMethod() {
+        return HttpMethod.HEAD;
+    }
+
+    @Override
+    public String toString() {
+        return resourceMethod.toString();
     }
 }
 
@@ -172,7 +243,12 @@ class ResourceHandler implements ResourceRouter.Resource {
     private Function<ResourceContext, Object> resource;
 
     public ResourceHandler(Class<?> resourceClass) {
-        this(resourceClass, new PathTemplate(resourceClass.getAnnotation(Path.class).value()), rc -> rc.getResource(resourceClass));
+        this(resourceClass, new PathTemplate(getTemplate(resourceClass)), rc -> rc.getResource(resourceClass));
+    }
+
+    private static String getTemplate(Class<?> resourceClass) {
+        if (!resourceClass.isAnnotationPresent(Path.class)) throw new IllegalArgumentException();
+        return resourceClass.getAnnotation(Path.class).value();
     }
 
     public ResourceHandler(Object resource, UriTemplate uriTemplate) {
@@ -190,8 +266,9 @@ class ResourceHandler implements ResourceRouter.Resource {
     public Optional<ResourceRouter.ResourceMethod> match(UriTemplate.MatchResult result, String httpMethod, String[] mediaTypes, ResourceContext resourceContext, UriInfoBuilder builder) {
         builder.addMatchedResource(resource.apply(resourceContext));
         String remaining = Optional.ofNullable(result.getRemaining()).orElse("");
-        return resourceMethods.findResourceMethods(remaining, httpMethod).or(() ->
-                subResourceLocators.findResourceMethods(remaining, httpMethod, mediaTypes, resourceContext, builder));
+        return resourceMethods.findResourceMethods(remaining, httpMethod)
+                .or(() ->
+                        subResourceLocators.findResourceMethods(remaining, httpMethod, mediaTypes, resourceContext, builder));
     }
 
     @Override

@@ -26,10 +26,6 @@ class UriHandlers {
                 .findFirst();
     }
 
-    public static <T extends UriHandler> Optional<T> match(String path, List<T> handlers) {
-        return match(path, handlers, r -> true);
-    }
-
     private record Result<T extends UriHandler>(Optional<UriTemplate.MatchResult> matched,
                                                T handler, Function<UriTemplate.MatchResult, Boolean> matchFunction) implements Comparable<Result<T>> {
 
