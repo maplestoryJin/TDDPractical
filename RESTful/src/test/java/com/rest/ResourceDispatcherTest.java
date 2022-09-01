@@ -15,7 +15,8 @@ import java.util.Optional;
 import java.util.Vector;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -54,6 +55,20 @@ public class ResourceDispatcherTest {
         OutBoundResponse response = router.dispatch(request, context);
         assertSame(entity, response.getGenericEntity());
         assertEquals(200, response.getStatus());
+    }
+
+    @Test
+    void should_use_response_object_from_resource_method() {
+        OutBoundResponse returnResponse = mock(OutBoundResponse.class);
+        when(returnResponse.getStatus()).thenReturn(304);
+
+        GenericEntity<OutBoundResponse> entity = new GenericEntity<>(returnResponse, OutBoundResponse.class);
+        DefaultResourceRouter router = new DefaultResourceRouter(runtime, List.of(
+                rootResource(matched("/users/1", result("/1")), returns(entity))));
+
+        OutBoundResponse response = router.dispatch(request, context);
+        assertEquals(304, response.getStatus());
+
     }
 
     @Test

@@ -48,7 +48,7 @@ class DefaultResourceRouter implements ResourceRouter {
         Optional<ResourceMethod> method = UriHandlers.mapMatched(path, rootResources, (result, resource) -> findResourceMethod(req, resourceContext, uri, result, resource));
         if (method.isEmpty()) return (OutBoundResponse) Response.status(Response.Status.NOT_FOUND).build();
         return (OutBoundResponse) method.map(m -> m.call(resourceContext, uri))
-                .map(entity -> Response.ok(entity).build())
+                .map(entity -> (entity.getEntity() instanceof OutBoundResponse) ? ((OutBoundResponse) entity.getEntity()) : Response.ok(entity).build())
                 .orElseGet(() -> Response.noContent().build());
     }
 
