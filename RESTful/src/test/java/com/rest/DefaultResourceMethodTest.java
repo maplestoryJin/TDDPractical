@@ -11,11 +11,16 @@ import jakarta.ws.rs.core.UriInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Proxy;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class DefaultResourceMethodTest {
 
@@ -25,9 +30,18 @@ class DefaultResourceMethodTest {
     private UriInfo uriInfo;
     private MultivaluedHashMap<String, String> parameters;
 
+    private LastCall lastCall;
+
     @BeforeEach
     void setUp() {
-        resource = mock(CallableResourceMethods.class);
+        resource = (CallableResourceMethods) Proxy.newProxyInstance(getClass().getClassLoader(), new Class[]{CallableResourceMethods.class}, (proxy, method, args) -> {
+            lastCall = new LastCall(method.getName() +
+                    "(" +
+                    Arrays.stream(method.getParameters()).map(p -> p.getType().getSimpleName()).collect(Collectors.joining(",")) +
+                    ")",
+                    args != null ? List.of(args) : List.of());
+            return "getList".equals(method.getName()) ? new ArrayList<>() : null;
+        });
         resourceContext = mock(ResourceContext.class);
         uriInfo = mock(UriInfo.class);
         uriInfoBuilder = mock(UriInfoBuilder.class);
@@ -40,9 +54,21 @@ class DefaultResourceMethodTest {
 
     @Test
     void should_call_resource_method() throws NoSuchMethodException {
-        when(resource.get()).thenReturn("resource called");
         DefaultResourceMethod method = getResourceMethod("get");
-        assertEquals(new GenericEntity<>("resource called", String.class), method.call(resourceContext, uriInfoBuilder));
+        method.call(resourceContext, uriInfoBuilder);
+        assertEquals("get()", lastCall.name);
+    }
+
+    @Test
+    void should_inject_string_to_path_param() throws NoSuchMethodException {
+        DefaultResourceMethod resourceMethod = getResourceMethod("getPathParam", String.class);
+
+        parameters.put("path", List.of("path"));
+        resourceMethod.call(resourceContext, uriInfoBuilder);
+
+        assertEquals("getPathParam(String)", lastCall.name);
+        assertEquals(List.of("path"), lastCall.arguments);
+
     }
 
     @Test
@@ -53,22 +79,11 @@ class DefaultResourceMethodTest {
 
     @Test
     void should_use_resource_method_generic_return_type() throws NoSuchMethodException {
-        when(resource.getList()).thenReturn(List.of());
 
         DefaultResourceMethod method = getResourceMethod("getList");
 
         assertEquals(new GenericEntity<>(List.of(), CallableResourceMethods.class.getMethod("getList").getGenericReturnType()),
                 method.call(resourceContext, uriInfoBuilder));
-    }
-
-    @Test
-    void should_inject_string_to_path_param() throws NoSuchMethodException {
-        DefaultResourceMethod resourceMethod = getResourceMethod("getPathParam", String.class);
-
-        parameters.put("path", List.of("path"));
-        resourceMethod.call(resourceContext, uriInfoBuilder);
-
-        verify(resource).getPathParam(eq("path"));
     }
 
     @Test
@@ -78,7 +93,9 @@ class DefaultResourceMethodTest {
         parameters.put("path", List.of("1"));
         resourceMethod.call(resourceContext, uriInfoBuilder);
 
-        verify(resource).getPathParam(eq(1));
+
+        assertEquals("getPathParam(int)", lastCall.name);
+        assertEquals(List.of(1), lastCall.arguments);
     }
 
     @Test
@@ -88,7 +105,9 @@ class DefaultResourceMethodTest {
         parameters.put("query", List.of("query"));
         resourceMethod.call(resourceContext, uriInfoBuilder);
 
-        verify(resource).getQueryParam(eq("query"));
+
+        assertEquals("getQueryParam(String)", lastCall.name);
+        assertEquals(List.of("query"), lastCall.arguments);
     }
 
     @Test
@@ -98,7 +117,11 @@ class DefaultResourceMethodTest {
         parameters.put("query", List.of("1"));
         resourceMethod.call(resourceContext, uriInfoBuilder);
 
-        verify(resource).getQueryParam(eq(1));
+        assertEquals("getQueryParam(int)", lastCall.name);
+        assertEquals(List.of(1), lastCall.arguments);
+    }
+
+    record LastCall(String name, List<Object> arguments) {
     }
 
     private DefaultResourceMethod getResourceMethod(String name, Class<?>... types) throws NoSuchMethodException {
