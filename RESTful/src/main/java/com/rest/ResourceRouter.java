@@ -13,9 +13,13 @@ import jakarta.ws.rs.core.UriInfo;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
+import java.lang.reflect.Type;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import static com.rest.DefaultResourceMethod.ValueConverter.singleValued;
 
 public interface ResourceRouter {
     OutBoundResponse dispatch(HttpServletRequest req, ResourceContext rc);
@@ -140,28 +144,43 @@ class DefaultResourceMethod implements ResourceRouter.ResourceMethod {
                 .findFirst().get().annotationType().getAnnotation(HttpMethod.class).value();
     }
 
+    private static ValueProvider pathParam = (parameter, uriInfo) ->
+            Optional.ofNullable(parameter.getAnnotation(PathParam.class))
+                    .map(annotation -> uriInfo.getPathParameters().get(annotation.value()));
+    private static ValueProvider queryParam = (parameter, uriInfo) ->
+            Optional.ofNullable(parameter.getAnnotation(QueryParam.class))
+                    .map(annotation -> uriInfo.getPathParameters().get(annotation.value()));
+    private static Map<Type, ValueConverter<?>> converters = Map.of(int.class, singleValued(Integer::parseInt),
+            String.class, singleValued(s -> s));
+    private static List<ValueProvider> providers = List.of(pathParam, queryParam);
+
     @Override
     public GenericEntity<?> call(ResourceContext resourceContext, UriInfoBuilder builder) {
         try {
             UriInfo uriInfo = builder.createUriInfo();
-            Object[] parameters = Arrays.stream(method.getParameters()).map(parameter -> {
-                List<String> values;
-                if (parameter.isAnnotationPresent(PathParam.class)) {
-                    String name = parameter.getAnnotation(PathParam.class).value();
-                    values = uriInfo.getPathParameters().get(name);
-                } else {
-                    String name = parameter.getAnnotation(QueryParam.class).value();
-                    values = uriInfo.getPathParameters().get(name);
-                }
-                String value = values.get(0);
-                if (parameter.getType() == int.class) return Integer.parseInt(value);
-                return value;
-            }).collect(Collectors.toList()).toArray(Object[]::new);
-            Object result = method.invoke(builder.getLastMatchedResource(), parameters);
+            Object result = method.invoke(builder.getLastMatchedResource(),
+                    Arrays.stream(method.getParameters()).map(parameter -> providers.stream().map(provider -> provider.provide(parameter, uriInfo))
+                            .filter(Optional::isPresent)
+                            .findFirst()
+                            .flatMap(values1 -> values1.map(it -> converters.get(parameter.getType()).fromString(it)))
+                            .orElse(null)).collect(Collectors.toList()).toArray(Object[]::new));
             return result != null ? new GenericEntity<>(result, method.getGenericReturnType()) : null;
         } catch (IllegalAccessException | InvocationTargetException e) {
             throw new RuntimeException(e);
         }
+    }
+
+
+    interface ValueProvider {
+        Optional<List<String>> provide(Parameter parameter, UriInfo uriInfo);
+    }
+
+    interface ValueConverter<T> {
+        static <T> ValueConverter<T> singleValued(Function<String, T> converter) {
+            return values -> converter.apply(values.get(0));
+        }
+
+        T fromString(List<String> value);
     }
 
     @Override
