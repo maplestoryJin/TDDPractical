@@ -90,6 +90,10 @@ public class ResourceMethodsTest {
         UriTemplate.MatchResult result = new PathTemplate("/messages").match("/messages/no-head").get();
         ResourceRouter.ResourceMethod method = resourceMethods.findResourceMethods(result.getRemaining(), "OPTIONS").get();
 
+        assertEquals(HttpMethod.OPTIONS, method.getHttpMethod());
+
+        assertInstanceOf(PathTemplate.class, method.getUriTemplate());
+
         GenericEntity<?> entity = method.call(resourceContext, uriInfoBuilder);
         Response response = (Response) entity.getEntity();
 
