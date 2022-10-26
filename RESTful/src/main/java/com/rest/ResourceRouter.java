@@ -151,14 +151,6 @@ class DefaultResourceMethod implements ResourceRouter.ResourceMethod {
             Optional.ofNullable(parameter.getAnnotation(QueryParam.class))
                     .map(annotation -> uriInfo.getPathParameters().get(annotation.value()));
 
-    private static Map<Type, ValueConverter<?>> converters = Map.of(int.class, singleValued(Integer::parseInt),
-            byte.class, singleValued(Byte::parseByte),
-            char.class, singleValued(s -> s.charAt(0)),
-            short.class, singleValued(Short::parseShort),
-            String.class, singleValued(s -> s),
-            boolean.class, singleValued(Boolean::parseBoolean),
-            float.class, singleValued(Float::parseFloat),
-            double.class, singleValued(Double::parseDouble));
     private static List<ValueProvider> providers = List.of(pathParam, queryParam);
 
     @Override
@@ -169,11 +161,32 @@ class DefaultResourceMethod implements ResourceRouter.ResourceMethod {
                     Arrays.stream(method.getParameters()).map(parameter -> providers.stream().map(provider -> provider.provide(parameter, uriInfo))
                             .filter(Optional::isPresent)
                             .findFirst()
-                            .flatMap(values1 -> values1.map(it -> converters.get(parameter.getType()).fromString(it)))
+                            .flatMap(values -> values.flatMap(it -> convert(parameter.getType(), it)))
                             .orElse(null)).collect(Collectors.toList()).toArray(Object[]::new));
             return result != null ? new GenericEntity<>(result, method.getGenericReturnType()) : null;
         } catch (IllegalAccessException | InvocationTargetException e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    public Optional<Object> convert(Class<?> converter, List<String> values) {
+        return PrimitiveConverter.convert(converter, values)
+                .or(() -> ConverterConstructor.convert(converter, values.get(0)));
+    }
+
+
+    class PrimitiveConverter {
+        private static Map<Type, ValueConverter<Object>> primitive = Map.of(int.class, singleValued(Integer::parseInt),
+                byte.class, singleValued(Byte::parseByte),
+                char.class, singleValued(s -> s.charAt(0)),
+                short.class, singleValued(Short::parseShort),
+                String.class, singleValued(s -> s),
+                boolean.class, singleValued(Boolean::parseBoolean),
+                float.class, singleValued(Float::parseFloat),
+                double.class, singleValued(Double::parseDouble));
+
+        static Optional<Object> convert(Class<?> converter, List<String> values) {
+            return Optional.ofNullable(primitive.get(converter)).map(it -> it.fromString(values));
         }
     }
 
@@ -234,6 +247,19 @@ class HeadResourceMethod implements ResourceRouter.ResourceMethod {
         return resourceMethod.toString();
     }
 }
+
+
+class ConverterConstructor {
+
+    public static Optional<Object> convert(Class<?> converter, String value) {
+        try {
+            return Optional.of(converter.getConstructor(String.class).newInstance(value));
+        } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+            return Optional.empty();
+        }
+    }
+}
+
 
 class SubResourceLocators {
 

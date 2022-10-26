@@ -13,10 +13,13 @@ import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;
 
+import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -91,16 +94,20 @@ class DefaultResourceMethodTest {
                 new InjectableTypeTestCase(boolean.class, "true", true),
                 new InjectableTypeTestCase(byte.class, "-1", ((byte) -1)),
                 new InjectableTypeTestCase(char.class, "c", 'c'),
-                new InjectableTypeTestCase(int.class, "1", 1)
+                new InjectableTypeTestCase(int.class, "1", 1),
+                new InjectableTypeTestCase(BigDecimal.class, "12345", new BigDecimal("12345"))
         );
 
         List<String> paramTypes = List.of("getPathParam", "getQueryParam");
         for (final String type : paramTypes) {
             for (final InjectableTypeTestCase typeCase : typeCases) {
-                tests.add(DynamicTest.dynamicTest("should inject " + typeCase.type.getSimpleName() +
+                Optional<Method> existMethod = Arrays.stream(CallableResourceMethods.class.getMethods()).filter(m -> m.getName().equals(type))
+                        .filter(m -> Arrays.stream(m.getParameterTypes()).toList().equals(List.of(typeCase.type)))
+                        .findFirst();
+                existMethod.ifPresent(m -> tests.add(DynamicTest.dynamicTest("should inject " + typeCase.type.getSimpleName() +
                         " to " + type, () -> {
                     verifyResourceMethod(type, typeCase.type, typeCase.string, typeCase.value);
-                }));
+                })));
             }
         }
         return tests;
@@ -152,6 +159,9 @@ class DefaultResourceMethodTest {
         String getPathParam(@PathParam("param") char value);
 
         @GET
+        String getQueryParam(@PathParam("param") BigDecimal value);
+
+        @GET
         String getQueryParam(@QueryParam("param") String value);
 
         @GET
@@ -185,8 +195,6 @@ class DefaultResourceMethodTest {
     }
 
     // TODO using default converters for path, query, matrix(uri) form, header, cookie (request)
-    // TODO default converters for int, short, float, double, byte, char, string and boolean
-    // TODO default converters for class with converter constructor
     // TODO default converters for class with converter factory
     // TODO default converters for List, Set, SortSet
     // TODO injection - get injectable from resource context
