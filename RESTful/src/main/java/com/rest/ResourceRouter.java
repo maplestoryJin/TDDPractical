@@ -152,7 +152,12 @@ class DefaultResourceMethod implements ResourceRouter.ResourceMethod {
                     .map(annotation -> uriInfo.getPathParameters().get(annotation.value()));
 
     private static Map<Type, ValueConverter<?>> converters = Map.of(int.class, singleValued(Integer::parseInt),
+            byte.class, singleValued(Byte::parseByte),
+            char.class, singleValued(s -> s.charAt(0)),
+            short.class, singleValued(Short::parseShort),
             String.class, singleValued(s -> s),
+            boolean.class, singleValued(Boolean::parseBoolean),
+            float.class, singleValued(Float::parseFloat),
             double.class, singleValued(Double::parseDouble));
     private static List<ValueProvider> providers = List.of(pathParam, queryParam);
 

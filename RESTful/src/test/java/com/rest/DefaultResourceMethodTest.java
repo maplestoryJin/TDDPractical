@@ -86,6 +86,11 @@ class DefaultResourceMethodTest {
         List<InjectableTypeTestCase> typeCases = List.of(
                 new InjectableTypeTestCase(String.class, "string", "string"),
                 new InjectableTypeTestCase(double.class, "3.5", 3.5),
+                new InjectableTypeTestCase(float.class, "2.5f", 2.5f),
+                new InjectableTypeTestCase(short.class, "2", (short) 2),
+                new InjectableTypeTestCase(boolean.class, "true", true),
+                new InjectableTypeTestCase(byte.class, "-1", ((byte) -1)),
+                new InjectableTypeTestCase(char.class, "c", 'c'),
                 new InjectableTypeTestCase(int.class, "1", 1)
         );
 
@@ -132,6 +137,21 @@ class DefaultResourceMethodTest {
         String getPathParam(@PathParam("param") double value);
 
         @GET
+        String getPathParam(@PathParam("param") short value);
+
+        @GET
+        String getPathParam(@PathParam("param") float value);
+
+        @GET
+        String getPathParam(@PathParam("param") boolean value);
+
+        @GET
+        String getPathParam(@PathParam("param") byte value);
+
+        @GET
+        String getPathParam(@PathParam("param") char value);
+
+        @GET
         String getQueryParam(@QueryParam("param") String value);
 
         @GET
@@ -139,6 +159,21 @@ class DefaultResourceMethodTest {
 
         @GET
         String getQueryParam(@QueryParam("param") double value);
+
+        @GET
+        String getQueryParam(@QueryParam("param") short value);
+
+        @GET
+        String getQueryParam(@QueryParam("param") float value);
+
+        @GET
+        String getQueryParam(@QueryParam("param") boolean value);
+
+        @GET
+        String getQueryParam(@QueryParam("param") byte value);
+
+        @GET
+        String getQueryParam(@QueryParam("param") char value);
     }
 
 
