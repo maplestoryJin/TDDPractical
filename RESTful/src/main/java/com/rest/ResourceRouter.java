@@ -150,8 +150,10 @@ class DefaultResourceMethod implements ResourceRouter.ResourceMethod {
     private static ValueProvider queryParam = (parameter, uriInfo) ->
             Optional.ofNullable(parameter.getAnnotation(QueryParam.class))
                     .map(annotation -> uriInfo.getPathParameters().get(annotation.value()));
+
     private static Map<Type, ValueConverter<?>> converters = Map.of(int.class, singleValued(Integer::parseInt),
-            String.class, singleValued(s -> s));
+            String.class, singleValued(s -> s),
+            double.class, singleValued(Double::parseDouble));
     private static List<ValueProvider> providers = List.of(pathParam, queryParam);
 
     @Override

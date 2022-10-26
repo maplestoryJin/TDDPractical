@@ -9,7 +9,9 @@ import jakarta.ws.rs.core.GenericEntity;
 import jakarta.ws.rs.core.MultivaluedHashMap;
 import jakarta.ws.rs.core.UriInfo;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestFactory;
 
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
@@ -35,10 +37,7 @@ class DefaultResourceMethodTest {
     @BeforeEach
     void setUp() {
         resource = (CallableResourceMethods) Proxy.newProxyInstance(getClass().getClassLoader(), new Class[]{CallableResourceMethods.class}, (proxy, method, args) -> {
-            lastCall = new LastCall(method.getName() +
-                    "(" +
-                    Arrays.stream(method.getParameters()).map(p -> p.getType().getSimpleName()).collect(Collectors.joining(",")) +
-                    ")",
+            lastCall = new LastCall(getMethodName(method.getName(), Arrays.stream(method.getParameters()).map(p -> p.getType()).collect(Collectors.toList())),
                     args != null ? List.of(args) : List.of());
             return "getList".equals(method.getName()) ? new ArrayList<>() : null;
         });
@@ -52,6 +51,10 @@ class DefaultResourceMethodTest {
         when(uriInfo.getPathParameters()).thenReturn(parameters);
     }
 
+    private String getMethodName(String name, List<? extends Class<?>> types) {
+        return name + "(" + types.stream().map(Class::getSimpleName).collect(Collectors.joining(",")) + ")";
+    }
+
     @Test
     void should_call_resource_method() throws NoSuchMethodException {
         DefaultResourceMethod method = getResourceMethod("get");
@@ -59,17 +62,7 @@ class DefaultResourceMethodTest {
         assertEquals("get()", lastCall.name);
     }
 
-    @Test
-    void should_inject_string_to_path_param() throws NoSuchMethodException {
-        DefaultResourceMethod resourceMethod = getResourceMethod("getPathParam", String.class);
 
-        parameters.put("path", List.of("path"));
-        resourceMethod.call(resourceContext, uriInfoBuilder);
-
-        assertEquals("getPathParam(String)", lastCall.name);
-        assertEquals(List.of("path"), lastCall.arguments);
-
-    }
 
     @Test
     void should_call_resource_method_with_void_return_type() throws NoSuchMethodException {
@@ -86,40 +79,68 @@ class DefaultResourceMethodTest {
                 method.call(resourceContext, uriInfoBuilder));
     }
 
-    @Test
-    void should_inject_int_to_path_param() throws NoSuchMethodException {
-        DefaultResourceMethod resourceMethod = getResourceMethod("getPathParam", int.class);
+    @TestFactory
+    public List<DynamicTest> injectableTypes() {
+        List<DynamicTest> tests = new ArrayList<>();
 
-        parameters.put("path", List.of("1"));
-        resourceMethod.call(resourceContext, uriInfoBuilder);
+        List<InjectableTypeTestCase> typeCases = List.of(
+                new InjectableTypeTestCase(String.class, "string", "string"),
+                new InjectableTypeTestCase(double.class, "3.5", 3.5),
+                new InjectableTypeTestCase(int.class, "1", 1)
+        );
 
-
-        assertEquals("getPathParam(int)", lastCall.name);
-        assertEquals(List.of(1), lastCall.arguments);
+        List<String> paramTypes = List.of("getPathParam", "getQueryParam");
+        for (final String type : paramTypes) {
+            for (final InjectableTypeTestCase typeCase : typeCases) {
+                tests.add(DynamicTest.dynamicTest("should inject " + typeCase.type.getSimpleName() +
+                        " to " + type, () -> {
+                    verifyResourceMethod(type, typeCase.type, typeCase.string, typeCase.value);
+                }));
+            }
+        }
+        return tests;
     }
 
-    @Test
-    void should_inject_string_to_query_param() throws NoSuchMethodException {
-        DefaultResourceMethod resourceMethod = getResourceMethod("getQueryParam", String.class);
-
-        parameters.put("query", List.of("query"));
+    private void verifyResourceMethod(String method, Class<?> type, String paramString, Object paramValue) throws NoSuchMethodException {
+        DefaultResourceMethod resourceMethod = getResourceMethod(method, type);
+        parameters.put("param", List.of(paramString));
         resourceMethod.call(resourceContext, uriInfoBuilder);
 
-
-        assertEquals("getQueryParam(String)", lastCall.name);
-        assertEquals(List.of("query"), lastCall.arguments);
+        assertEquals(getMethodName(method, List.of(type)), lastCall.name);
+        assertEquals(List.of(paramValue), lastCall.arguments);
     }
 
-    @Test
-    void should_inject_int_to_query_param() throws NoSuchMethodException {
-        DefaultResourceMethod resourceMethod = getResourceMethod("getQueryParam", int.class);
 
-        parameters.put("query", List.of("1"));
-        resourceMethod.call(resourceContext, uriInfoBuilder);
+    interface CallableResourceMethods {
 
-        assertEquals("getQueryParam(int)", lastCall.name);
-        assertEquals(List.of(1), lastCall.arguments);
+        @POST
+        void post();
+
+        @GET
+        String get();
+
+        @GET
+        List<String> getList();
+
+        @GET
+        String getPathParam(@PathParam("param") String value);
+
+        @GET
+        String getPathParam(@PathParam("param") int value);
+
+        @GET
+        String getPathParam(@PathParam("param") double value);
+
+        @GET
+        String getQueryParam(@QueryParam("param") String value);
+
+        @GET
+        String getQueryParam(@QueryParam("param") int value);
+
+        @GET
+        String getQueryParam(@QueryParam("param") double value);
     }
+
 
     record LastCall(String name, List<Object> arguments) {
     }
@@ -137,27 +158,7 @@ class DefaultResourceMethodTest {
     // TODO injection - can inject from resource itself
     // TODO injection - can inject uri info from uri info builder
 
-    interface CallableResourceMethods {
+    record InjectableTypeTestCase(Class<?> type, String string, Object value) {
 
-        @POST
-        void post();
-
-        @GET
-        String get();
-
-        @GET
-        List<String> getList();
-
-        @GET
-        String getPathParam(@PathParam("path") String value);
-
-        @GET
-        String getPathParam(@PathParam("path") int value);
-
-        @GET
-        String getQueryParam(@QueryParam("query") String value);
-
-        @GET
-        String getQueryParam(@QueryParam("query") int value);
     }
 }
