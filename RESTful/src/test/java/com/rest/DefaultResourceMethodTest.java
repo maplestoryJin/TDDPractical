@@ -246,9 +246,6 @@ class DefaultResourceMethodTest {
 
     // TODO using default converters for path, query, matrix(uri) form, header, cookie (request)
     // TODO default converters for List, Set, SortSet
-    // TODO injection - get injectable from resource context
-    // TODO injection - can inject from resource itself
-    // TODO injection - can inject uri info from uri info builder
 
     record InjectableTypeTestCase(Class<?> type, String string, Object value) {
     }
