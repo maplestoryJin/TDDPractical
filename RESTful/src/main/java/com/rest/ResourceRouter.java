@@ -3,17 +3,13 @@ package com.rest;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.ws.rs.HttpMethod;
 import jakarta.ws.rs.Path;
-import jakarta.ws.rs.PathParam;
-import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.container.ResourceContext;
 import jakarta.ws.rs.core.GenericEntity;
 import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.Response;
-import jakarta.ws.rs.core.UriInfo;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.lang.reflect.Parameter;
 import java.lang.reflect.Type;
 import java.util.*;
 import java.util.function.Function;
@@ -144,46 +140,10 @@ class DefaultResourceMethod implements ResourceRouter.ResourceMethod {
                 .findFirst().get().annotationType().getAnnotation(HttpMethod.class).value();
     }
 
-    private static ValueProvider pathParam = (parameter, uriInfo) ->
-            Optional.ofNullable(parameter.getAnnotation(PathParam.class))
-                    .map(annotation -> uriInfo.getPathParameters().get(annotation.value()));
-    private static ValueProvider queryParam = (parameter, uriInfo) ->
-            Optional.ofNullable(parameter.getAnnotation(QueryParam.class))
-                    .map(annotation -> uriInfo.getPathParameters().get(annotation.value()));
-
-    private static List<ValueProvider> providers = List.of(pathParam, queryParam);
-
     @Override
     public GenericEntity<?> call(ResourceContext resourceContext, UriInfoBuilder builder) {
-        try {
-            UriInfo uriInfo = builder.createUriInfo();
-            Object result = method.invoke(builder.getLastMatchedResource(),
-                    Arrays.stream(method.getParameters()).map(parameter -> injectParameter(parameter, uriInfo)
-                            .or(() -> injectContext(parameter, resourceContext, uriInfo))
-                            .orElse(null)).collect(Collectors.toList()).toArray(Object[]::new));
-            return result != null ? new GenericEntity<>(result, method.getGenericReturnType()) : null;
-        } catch (IllegalAccessException | InvocationTargetException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private Optional<Object> injectContext(Parameter parameter, ResourceContext resourceContext, UriInfo uriInfo) {
-        if (parameter.getType().equals(ResourceContext.class)) return Optional.of(resourceContext);
-        if (parameter.getType().equals(UriInfo.class)) return Optional.of(uriInfo);
-        return Optional.of(resourceContext.getResource(parameter.getType()));
-    }
-
-    private Optional<Object> injectParameter(Parameter parameter, UriInfo uriInfo) {
-        return providers.stream().map(provider -> provider.provide(parameter, uriInfo))
-                .filter(Optional::isPresent)
-                .findFirst()
-                .flatMap(values -> values.flatMap(it -> convert(parameter.getType(), it)));
-    }
-
-    public Optional<Object> convert(Class<?> converter, List<String> values) {
-        return PrimitiveConverter.convert(converter, values)
-                .or(() -> ConverterConstructor.convert(converter, values.get(0)))
-                .or(() -> ConverterFactory.convert(converter, values.get(0)));
+        Object result = MethodInvoker.invoke(method, resourceContext, builder);
+        return result != null ? new GenericEntity<>(result, method.getGenericReturnType()) : null;
     }
 
 
@@ -202,10 +162,6 @@ class DefaultResourceMethod implements ResourceRouter.ResourceMethod {
         }
     }
 
-
-    interface ValueProvider {
-        Optional<List<String>> provide(Parameter parameter, UriInfo uriInfo);
-    }
 
     interface ValueConverter<T> {
         static <T> ValueConverter<T> singleValued(Function<String, T> converter) {
