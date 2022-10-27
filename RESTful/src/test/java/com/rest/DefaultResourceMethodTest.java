@@ -27,6 +27,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+enum Converter {
+    Primitive, Constructor, Factory
+}
+
 class DefaultResourceMethodTest {
 
     private CallableResourceMethods resource;
@@ -95,6 +99,7 @@ class DefaultResourceMethodTest {
                 new InjectableTypeTestCase(byte.class, "-1", ((byte) -1)),
                 new InjectableTypeTestCase(char.class, "c", 'c'),
                 new InjectableTypeTestCase(int.class, "1", 1),
+                new InjectableTypeTestCase(Converter.class, "Factory", Converter.Factory),
                 new InjectableTypeTestCase(BigDecimal.class, "12345", new BigDecimal("12345"))
         );
 
@@ -159,7 +164,10 @@ class DefaultResourceMethodTest {
         String getPathParam(@PathParam("param") char value);
 
         @GET
-        String getQueryParam(@PathParam("param") BigDecimal value);
+        String getPathParam(@PathParam("param") BigDecimal value);
+
+        @GET
+        String getPathParam(@PathParam("param") Converter value);
 
         @GET
         String getQueryParam(@QueryParam("param") String value);
@@ -184,6 +192,12 @@ class DefaultResourceMethodTest {
 
         @GET
         String getQueryParam(@QueryParam("param") char value);
+
+        @GET
+        String getQueryParam(@QueryParam("param") BigDecimal value);
+
+        @GET
+        String getQueryParam(@QueryParam("param") Converter value);
     }
 
 
@@ -195,13 +209,11 @@ class DefaultResourceMethodTest {
     }
 
     // TODO using default converters for path, query, matrix(uri) form, header, cookie (request)
-    // TODO default converters for class with converter factory
     // TODO default converters for List, Set, SortSet
     // TODO injection - get injectable from resource context
     // TODO injection - can inject from resource itself
     // TODO injection - can inject uri info from uri info builder
 
     record InjectableTypeTestCase(Class<?> type, String string, Object value) {
-
     }
 }

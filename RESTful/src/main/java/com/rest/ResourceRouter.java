@@ -171,7 +171,8 @@ class DefaultResourceMethod implements ResourceRouter.ResourceMethod {
 
     public Optional<Object> convert(Class<?> converter, List<String> values) {
         return PrimitiveConverter.convert(converter, values)
-                .or(() -> ConverterConstructor.convert(converter, values.get(0)));
+                .or(() -> ConverterConstructor.convert(converter, values.get(0)))
+                .or(() -> ConverterFactory.convert(converter, values.get(0)));
     }
 
 
@@ -255,6 +256,17 @@ class ConverterConstructor {
         try {
             return Optional.of(converter.getConstructor(String.class).newInstance(value));
         } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+            return Optional.empty();
+        }
+    }
+}
+
+class ConverterFactory {
+
+    public static Optional<Object> convert(Class<?> converter, String value) {
+        try {
+            return Optional.of(converter.getMethod("valueOf", String.class).invoke(null, value));
+        } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
             return Optional.empty();
         }
     }
