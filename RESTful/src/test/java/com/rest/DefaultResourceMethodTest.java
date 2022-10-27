@@ -5,6 +5,7 @@ import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.container.ResourceContext;
+import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.GenericEntity;
 import jakarta.ws.rs.core.MultivaluedHashMap;
 import jakarta.ws.rs.core.UriInfo;
@@ -24,11 +25,18 @@ import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+
 enum Converter {
     Primitive, Constructor, Factory
+}
+
+
+interface SomeServiceInContext {
+
 }
 
 class DefaultResourceMethodTest {
@@ -40,6 +48,7 @@ class DefaultResourceMethodTest {
     private MultivaluedHashMap<String, String> parameters;
 
     private LastCall lastCall;
+    private SomeServiceInContext service;
 
     @BeforeEach
     void setUp() {
@@ -51,11 +60,13 @@ class DefaultResourceMethodTest {
         resourceContext = mock(ResourceContext.class);
         uriInfo = mock(UriInfo.class);
         uriInfoBuilder = mock(UriInfoBuilder.class);
+        service = mock(SomeServiceInContext.class);
 
         when(uriInfoBuilder.getLastMatchedResource()).thenReturn(resource);
         when(uriInfoBuilder.createUriInfo()).thenReturn(uriInfo);
         parameters = new MultivaluedHashMap<>();
         when(uriInfo.getPathParameters()).thenReturn(parameters);
+        when(resourceContext.getResource(eq(SomeServiceInContext.class))).thenReturn(service);
     }
 
     private String getMethodName(String name, List<? extends Class<?>> types) {
@@ -68,7 +79,6 @@ class DefaultResourceMethodTest {
         method.call(resourceContext, uriInfoBuilder);
         assertEquals("get()", lastCall.name);
     }
-
 
 
     @Test
@@ -87,7 +97,7 @@ class DefaultResourceMethodTest {
     }
 
     @TestFactory
-    public List<DynamicTest> injectableTypes() {
+    public List<DynamicTest> injectable_convertable_types() {
         List<DynamicTest> tests = new ArrayList<>();
 
         List<InjectableTypeTestCase> typeCases = List.of(
@@ -116,6 +126,23 @@ class DefaultResourceMethodTest {
             }
         }
         return tests;
+    }
+
+    @TestFactory
+    public List<DynamicTest> injectable_context_object() {
+
+        List<DynamicTest> tests = new ArrayList<>();
+
+        List<InjectableTypeTestCase> typeCases = List.of(
+                new InjectableTypeTestCase(SomeServiceInContext.class, "N/A", service),
+                new InjectableTypeTestCase(ResourceContext.class, "N/A", resourceContext),
+                new InjectableTypeTestCase(UriInfo.class, "N/A", uriInfo));
+        for (final InjectableTypeTestCase typeCase : typeCases) {
+            tests.add(DynamicTest.dynamicTest("should inject " + typeCase.type.getSimpleName() +
+                    " to " + "getContext", () -> verifyResourceMethod("getContext", typeCase.type, typeCase.string, typeCase.value)));
+        }
+        return tests;
+
     }
 
     private void verifyResourceMethod(String method, Class<?> type, String paramString, Object paramValue) throws NoSuchMethodException {
@@ -198,6 +225,15 @@ class DefaultResourceMethodTest {
 
         @GET
         String getQueryParam(@QueryParam("param") Converter value);
+
+        @GET
+        String getContext(@Context SomeServiceInContext service);
+
+        @GET
+        String getContext(@Context ResourceContext context);
+
+        @GET
+        String getContext(@Context UriInfo uriInfo);
     }
 
 
@@ -216,4 +252,6 @@ class DefaultResourceMethodTest {
 
     record InjectableTypeTestCase(Class<?> type, String string, Object value) {
     }
+
+
 }
