@@ -23,12 +23,12 @@ class MethodInvoker {
                     .map(annotation -> uriInfo.getPathParameters().get(annotation.value()));
     private static List<ValueProvider> providers = List.of(pathParam, queryParam);
 
-    static Object invoke(Method method1, ResourceContext resourceContext, UriInfoBuilder builder) {
+    static Object invoke(Method method, ResourceContext resourceContext, UriInfoBuilder builder) {
         Object result;
         try {
             UriInfo uriInfo = builder.createUriInfo();
-            result = method1.invoke(builder.getLastMatchedResource(),
-                    Arrays.stream(method1.getParameters()).map(parameter -> injectParameter(parameter, uriInfo)
+            result = method.invoke(builder.getLastMatchedResource(),
+                    Arrays.stream(method.getParameters()).map(parameter -> injectParameter(parameter, uriInfo)
                             .or(() -> injectContext(parameter, resourceContext, uriInfo))
                             .orElse(null)).collect(Collectors.toList()).toArray(Object[]::new));
         } catch (IllegalAccessException | InvocationTargetException e) {
