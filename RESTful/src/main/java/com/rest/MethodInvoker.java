@@ -2,6 +2,7 @@ package com.rest;
 
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.container.ResourceContext;
 import jakarta.ws.rs.core.UriInfo;
 
@@ -31,7 +32,10 @@ class MethodInvoker {
                     Arrays.stream(method.getParameters()).map(parameter -> injectParameter(parameter, uriInfo)
                             .or(() -> injectContext(parameter, resourceContext, uriInfo))
                             .orElse(null)).collect(Collectors.toList()).toArray(Object[]::new));
-        } catch (IllegalAccessException | InvocationTargetException e) {
+        } catch (InvocationTargetException e) {
+            if (e.getCause() instanceof WebApplicationException) throw ((WebApplicationException) e.getCause());
+            throw new RuntimeException(e);
+        } catch (IllegalAccessException e) {
             throw new RuntimeException(e);
         }
         return result;

@@ -3,6 +3,7 @@ package com.rest;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.ws.rs.HttpMethod;
 import jakarta.ws.rs.Path;
+import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.container.ResourceContext;
 import jakarta.ws.rs.core.GenericEntity;
 import jakarta.ws.rs.core.HttpHeaders;
@@ -278,13 +279,39 @@ class SubResourceLocators {
 
         @Override
         public Optional<ResourceRouter.ResourceMethod> match(UriTemplate.MatchResult result, String httpMethod, String[] mediaTypes, ResourceContext resourceContext, UriInfoBuilder builder) {
-            Object resource = builder.getLastMatchedResource();
             try {
+                builder.addMatchedPathParameters(result.getMatchedPathParameters());
                 Object subResource = MethodInvoker.invoke(method, resourceContext, builder);
-                return new ResourceHandler(subResource, uriTemplate).match(result, httpMethod, mediaTypes, resourceContext, builder);
+                return new ResourceHandler(subResource, uriTemplate).match(excludePathParameters(result), httpMethod, mediaTypes, resourceContext, builder);
+            } catch (WebApplicationException e) {
+                throw e;
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
+        }
+
+        private UriTemplate.MatchResult excludePathParameters(UriTemplate.MatchResult result) {
+            return new UriTemplate.MatchResult() {
+                @Override
+                public String getMatched() {
+                    return result.getMatched();
+                }
+
+                @Override
+                public String getRemaining() {
+                    return result.getRemaining();
+                }
+
+                @Override
+                public Map<String, String> getMatchedPathParameters() {
+                    return new HashMap<>();
+                }
+
+                @Override
+                public int compareTo(UriTemplate.MatchResult o) {
+                    return result.compareTo(o);
+                }
+            };
         }
 
     }
@@ -319,6 +346,7 @@ class ResourceHandler implements ResourceRouter.Resource {
     @Override
     public Optional<ResourceRouter.ResourceMethod> match(UriTemplate.MatchResult result, String httpMethod, String[] mediaTypes, ResourceContext resourceContext, UriInfoBuilder builder) {
         builder.addMatchedResource(resource.apply(resourceContext));
+        builder.addMatchedPathParameters(result.getMatchedPathParameters());
         String remaining = Optional.ofNullable(result.getRemaining()).orElse("");
         return resourceMethods.findResourceMethods(remaining, httpMethod)
                 .or(() ->

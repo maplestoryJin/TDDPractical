@@ -3,6 +3,7 @@ package com.rest;
 import jakarta.ws.rs.container.ResourceContext;
 import jakarta.ws.rs.core.MultivaluedHashMap;
 import jakarta.ws.rs.core.UriInfo;
+import jakarta.ws.rs.ext.RuntimeDelegate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
@@ -29,6 +30,7 @@ public abstract class InjectableCallerTest {
     protected SomeServiceInContext service;
     protected Object resource;
 
+
     @BeforeEach
     void setUp() {
         resource = initResource();
@@ -42,6 +44,11 @@ public abstract class InjectableCallerTest {
         parameters = new MultivaluedHashMap<>();
         when(uriInfo.getPathParameters()).thenReturn(parameters);
         when(resourceContext.getResource(eq(SomeServiceInContext.class))).thenReturn(service);
+
+
+        RuntimeDelegate runtimeDelegate = mock(RuntimeDelegate.class);
+        RuntimeDelegate.setInstance(runtimeDelegate);
+        when(runtimeDelegate.createResponseBuilder()).thenReturn(new StubResponseBuilder());
     }
 
     protected String getMethodName(String name, List<? extends Class<?>> types) {
@@ -96,6 +103,7 @@ public abstract class InjectableCallerTest {
         return tests;
 
     }
+
 
     private void verifyResourceMethod(String method, Class<?> type, String paramString, Object paramValue) throws NoSuchMethodException {
         parameters.put("param", List.of(paramString));

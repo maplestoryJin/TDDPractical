@@ -1,9 +1,6 @@
 package com.rest;
 
-import jakarta.ws.rs.GET;
-import jakarta.ws.rs.POST;
-import jakarta.ws.rs.PathParam;
-import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.*;
 import jakarta.ws.rs.container.ResourceContext;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.GenericEntity;
@@ -17,8 +14,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.*;
 
 
 enum Converter {
@@ -37,6 +33,7 @@ class DefaultResourceMethodTest extends InjectableCallerTest {
         return Proxy.newProxyInstance(getClass().getClassLoader(), new Class[]{CallableResourceMethods.class}, (proxy, method, args) -> {
             lastCall = new LastCall(getMethodName(method.getName(), Arrays.stream(method.getParameters()).map(p -> p.getType()).collect(Collectors.toList())),
                     args != null ? List.of(args) : List.of());
+            if ("throwWebApplicationException".equals(method.getName())) throw new WebApplicationException(300);
             return "getList".equals(method.getName()) ? new ArrayList<>() : null;
         });
     }
@@ -62,6 +59,19 @@ class DefaultResourceMethodTest extends InjectableCallerTest {
 
         assertEquals(new GenericEntity<>(List.of(), CallableResourceMethods.class.getMethod("getList").getGenericReturnType()),
                 method.call(resourceContext, builder));
+    }
+
+
+    @Test
+    void should_not_wrap_around_web_application_exception() {
+        parameters.put("param", List.of("param"));
+        try {
+            callInjectable("throwWebApplicationException", String.class);
+        } catch (WebApplicationException e) {
+            assertEquals(300, e.getResponse().getStatus());
+        } catch (Exception e) {
+            fail();
+        }
     }
 
     @Override
@@ -154,9 +164,9 @@ class DefaultResourceMethodTest extends InjectableCallerTest {
 
         @GET
         String getContext(@Context UriInfo uriInfo);
-    }
 
-    // TODO using default converters for path, query, matrix(uri) form, header, cookie (request)
-    // TODO default converters for List, Set, SortSet
+        @GET
+        String throwWebApplicationException(@PathParam("param") String path);
+    }
 
 }
